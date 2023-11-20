@@ -1,8 +1,6 @@
-import { APIGatewayProxyHandler } from 'aws-lambda';
-
-export const getProductsById: APIGatewayProxyHandler = async (event, _context) => {
+const { products } = require('./assets/products');
+module.exports.handler = async (event) => {
   try {
-    // Your logic to fetch product by ID goes here
     const productId = event.pathParameters?.id;
     if (!productId) {
       return {
@@ -11,18 +9,20 @@ export const getProductsById: APIGatewayProxyHandler = async (event, _context) =
       };
     }
 
-    // Fetch product details using the productId
+    const product = products.find(({ id }) => id === Number(productId));
 
-    const product = {
-      id: productId,
-      name: 'Sample Product',
-      price: 19.99,
-    };
+    if (!product) {
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ message: 'Product not found' }),
+      };
+    }
 
     return {
       statusCode: 200,
-      body: JSON.stringify(product),
+      body: product,
     };
+    
   } catch (error) {
     return {
       statusCode: 500,
