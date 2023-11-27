@@ -21,7 +21,6 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     getProductsListLambda.addToRolePolicy(new iam.PolicyStatement({
       actions: ['dynamodb:Scan'],
-      // resources: ['arn:aws:dynamodb:eu-west-1:123456789012:table/Products'],
       resources: ['*'],
     }));
 
@@ -38,7 +37,21 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     getProductsByIdLambda.addToRolePolicy(new iam.PolicyStatement({
       actions: ['dynamodb:Query', 'dynamodb:GetItem'],
-      // resources: ['arn:aws:dynamodb:eu-west-1:123456789012:table/Products'],
+      resources: ['*']
+    }));
+
+    const createProductLambda = new lambda.Function(this, 'CreateProductLambda', {
+      functionName: 'CreateProductLambda',
+      runtime: lambda.Runtime.NODEJS_16_X,
+      handler: 'createProduct.handler',
+      code: lambda.Code.fromAsset('lambda'),
+      environment: {
+        PRODUCTS_TABLE: 'Products',
+      }
+    });
+
+    createProductLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:PutItem'],
       resources: ['*']
     }));
 
@@ -49,6 +62,7 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     const productsResource = api.root.addResource('products');
     productsResource.addMethod('GET', new apigateway.LambdaIntegration(getProductsListLambda));
+    productsResource.addMethod('POST', new apigateway.LambdaIntegration(createProductLambda));
 
     const productIdResource = productsResource.addResource('{id}');
     productIdResource.addMethod('GET', new apigateway.LambdaIntegration(getProductsByIdLambda));
