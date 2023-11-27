@@ -37,7 +37,7 @@ export class AwsShopBackendStack extends cdk.Stack {
     });
 
     getProductsByIdLambda.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['dynamodb:GetItem'],
+      actions: ['dynamodb:Query', 'dynamodb:GetItem'],
       // resources: ['arn:aws:dynamodb:eu-west-1:123456789012:table/Products'],
       resources: ['*']
     }));
