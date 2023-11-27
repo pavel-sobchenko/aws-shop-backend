@@ -58,6 +58,10 @@ export class AwsShopBackendStack extends cdk.Stack {
     const api = new apigateway.RestApi(this, 'aws-shop-api', {
       restApiName: 'aws-shop-api',
       description: 'This is my first API Gateway service',
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+      }
     });
 
     const productsResource = api.root.addResource('products');

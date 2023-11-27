@@ -29,6 +29,11 @@ exports.handler = async (event) => {
 
         return {
             statusCode: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
+                'Access-Control-Allow-Methods': 'OPTIONS, GET',
+              },
             body: JSON.stringify(combinedResults),
         };
         } catch (error) {
