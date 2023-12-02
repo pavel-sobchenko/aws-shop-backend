@@ -1,8 +1,11 @@
-const { DynamoDB } = require('aws-sdk');
+const crypto = require('crypto');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { TransactWriteCommand } =  require("@aws-sdk/lib-dynamodb");
 
 exports.handler = async (event) => {
-    const dynamoDB = new DynamoDB.DocumentClient();
+    const dynamoDBClient = new DynamoDBClient();
     const productsTableName = process.env.PRODUCTS_TABLE;
+    const stockTableName = process.env.STOCK_TABLE;
 
     console.log('eventBody:', event.body);
 
@@ -11,24 +14,52 @@ exports.handler = async (event) => {
 
         console.log('requestBody:', requestBody);
 
-        if (!requestBody.id || !requestBody.title || !requestBody.description || !requestBody.price) {
+        if (!requestBody.title || !requestBody.description || !requestBody.price) {
             return {
               statusCode: 400,
               body: JSON.stringify({ error: 'Missing required fields' }),
             };
           }
 
-        const productsParams = {
-            TableName: productsTableName,
-            Item: {
-                id: requestBody.id,
-                title: requestBody.title,
-                description: requestBody.description,
-                price: requestBody.price,
-            },
-        };  
+        const id = `${crypto.randomUUID()}`;
 
-        await dynamoDB.put(productsParams).promise();
+        const product = {
+            id: id,
+            title: requestBody.title,
+            description: requestBody.description,
+            price: requestBody.price,
+            count: requestBody.count || 0
+        };
+
+        console.log('product:', product);
+
+        const stock = {
+            product_id: id,
+            count: requestBody.count || 0
+        };
+
+        console.log('stock:', stock);
+
+        const result = await dynamoDBClient.send(
+            new TransactWriteCommand({
+              TransactItems: [
+                {
+                  Put: {
+                    TableName: 'Products',
+                    Item: product
+                  },
+                },
+                {
+                  Put: {
+                    TableName: 'Stocks',
+                    Item: stock
+                  },
+                },
+              ],
+            }),
+          );
+
+        console.log('Transaction result:', result);
 
         return {
             statusCode: 201,
@@ -36,6 +67,14 @@ exports.handler = async (event) => {
         };
     } catch (error) {    
         console.error('Error creating product in DynamoDB table:', error);
+
+        if (error.name === 'TransactionCanceledException') {
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ message: 'Transaction failed' }),
+            };
+        }
+
         return {
             statusCode: 500,
             body: JSON.stringify({ message: 'Internal Server Error' }),

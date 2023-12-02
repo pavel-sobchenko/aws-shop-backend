@@ -10,7 +10,7 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     const getProductsListLambda = new lambda.Function(this, 'GetProductsListLambda', {
       functionName: 'GetProductsListLambda',
-      runtime: lambda.Runtime.NODEJS_16_X,
+      runtime: lambda.Runtime.NODEJS_18_X,
       code: lambda.Code.fromAsset('lambda'),
       handler: 'productList.handler',
       environment: {
@@ -26,7 +26,7 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     const getProductsByIdLambda = new lambda.Function(this, 'GetProductsByIdLambda', {
       functionName: 'GetProductsByIdLambda',
-      runtime: lambda.Runtime.NODEJS_16_X,
+      runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'getProductById.handler',
       code: lambda.Code.fromAsset('lambda'),
       environment: {
@@ -42,7 +42,7 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     const createProductLambda = new lambda.Function(this, 'CreateProductLambda', {
       functionName: 'CreateProductLambda',
-      runtime: lambda.Runtime.NODEJS_16_X,
+      runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'createProduct.handler',
       code: lambda.Code.fromAsset('lambda'),
       environment: {

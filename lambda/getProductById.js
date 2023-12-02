@@ -1,8 +1,14 @@
-const { DynamoDB } = require('aws-sdk');
+const { DynamoDBDocumentClient, GetCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+
+const client = new DynamoDBClient({ region: 'eu-west-1' });
+const docClent = DynamoDBDocumentClient.from(client);
 
 exports.handler = async (event) => {
   try {
+    console.log(`getProduct lambda invoked with event: ${JSON.stringify(event)}`);
     const productId = event.pathParameters?.id;
+    console.log('productId:', productId);
 
     if (!productId) {
       return {
@@ -11,46 +17,42 @@ exports.handler = async (event) => {
       };
     }
 
-    const dynamoDB = new DynamoDB.DocumentClient();
-    const productsTableName = process.env.PRODUCTS_TABLE;
-    const stockTableName = process.env.STOCK_TABLE;
+    const product = (await docClent.send(new GetCommand({
+      TableName: process.env.PRODUCTS_TABLE,
+      Key: { id: productId },
+    }))).Item;
 
-    const productsParams = { 
-        TableName: productsTableName, 
-        KeyConditionExpression: 'id = :idVal',
-        ExpressionAttributeValues: {
-          ':idVal': productId,
-        },
-    };
-    const stockParams = { 
-        TableName: stockTableName, 
-        Key: { product_id: productId } 
-    };
+    console.log('products:', product);
 
-    const productsResults = await dynamoDB.query(productsParams).promise();
-    console.log('ProductResults:', productsResults);
-    const productItem = productsResults.Items[0];
-
-    const stockResults = await dynamoDB.get(stockParams).promise();
-    console.log('stockResults:', stockResults);
-    const stock = stockResults.Item;
-
-    if (!productItem) {
+    if (!product) {
       return {
         statusCode: 404,
         body: JSON.stringify({ message: 'Product not found' }),
       };
     }
 
+    const stocks = (await docClent.send(new GetCommand({
+      TableName: process.env.STOCK_TABLE,
+      Key: { product_id: productId },
+    }))).Item;
+
+    console.log('stocks:', stocks);
+
     return {
-      statusCode: 200,
-      body: JSON.stringify({
-        ...productItem,
-        count: stock?.count || 0,  
-      })
-    };
-    
+        statusCode: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
+          'Access-Control-Allow-Methods': 'OPTIONS, GET',
+        },  
+        body: JSON.stringify({
+          ...product,
+          count: stocks?.count || 0,
+        })
+      };
+
   } catch (error) {
+    console.log('Error:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({ message: 'Internal Server Error' }),

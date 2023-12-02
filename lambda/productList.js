@@ -1,25 +1,25 @@
-const { DynamoDB } = require('aws-sdk');
+const { DynamoDBClient, ScanCommand } = require('@aws-sdk/client-dynamodb');
+const { unmarshall } = require('@aws-sdk/util-dynamodb');
+
+const client = new DynamoDBClient({ region: 'eu-west-1' });
 
 exports.handler = async (event) => {
-    const dynamoDB = new DynamoDB.DocumentClient();
-    const productsTableName = process.env.PRODUCTS_TABLE;
-    const stockTableName = process.env.STOCK_TABLE;
-
-    const productsParams = { TableName: productsTableName };
-    const stockParams = { TableName: stockTableName };
-
+    const productsParams = { TableName: process.env.PRODUCTS_TABLE };
+    const stockParams = { TableName: process.env.STOCK_TABLE };
 
     try {
-        const productsResults = await dynamoDB.scan(productsParams).promise();
-        console.log('productResults:', productsResults);
-        const products = productsResults.Items;
+        const productScan = new ScanCommand(productsParams);
+        const productItems = (await client.send(productScan)).Items
+            .map(item => unmarshall(item));
+        console.log('productResults:', productItems);
 
-        const stockResults = await dynamoDB.scan(stockParams).promise();
-        console.log('stockResults:', stockResults);
-        const stock = stockResults.Items;
+        const stockScan = new ScanCommand(stockParams);
+        const stockItems = (await client.send(stockScan)).Items
+            .map(item => unmarshall(item));
+        console.log('stockResults:', stockItems);
 
-        const combinedResults = products.map((product) => {
-            const stockItem = stock.find((s) => s.product_id === product.id);
+        const combinedResults = productItems.map((product) => {
+            const stockItem = stockItems.find((s) => s.product_id === product.id);
             return {
                 ...product,
                 count: stockItem?.count || 0,
@@ -33,16 +33,16 @@ exports.handler = async (event) => {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
                 'Access-Control-Allow-Methods': 'OPTIONS, GET',
-              },
+                },
             body: JSON.stringify(combinedResults),
         };
-        } catch (error) {
-            console.error('Error scanning DynamoDB table:', error);
-        
-            return {
-                statusCode: 500,
-                body: JSON.stringify({ message: 'Internal Server Error' }),
-            };
-        }
-  };
-  
+    } catch (error) {
+        console.error('Error scanning DynamoDB table:', error);
+    
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ message: 'Internal Server Error' }),
+        };
+    }
+
+};
