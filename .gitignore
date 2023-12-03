@@ -1,6 +1,7 @@
 *.js
 !jest.config.js
-!lambda/*.js
+!product-service/lambda/*.js
+!import-service/lambda/*.js
 *.d.ts
 node_modules
 .idea
