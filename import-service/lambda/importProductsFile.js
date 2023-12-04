@@ -22,6 +22,8 @@ exports.handler = async (event) => {
         const command = new PutObjectCommand(s3Params);
         const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 60 });
 
+        console.log('signedUrl:', signedUrl);
+
         return {
             statusCode: 200,
             headers: {
@@ -32,7 +34,7 @@ exports.handler = async (event) => {
             body: JSON.stringify({ signedUrl }),
         };
     } catch (error) {
-        console.error('Error scanning DynamoDB table:', error);
+        console.log('Error importing product files:', error);
 
         return {
             statusCode: 500,

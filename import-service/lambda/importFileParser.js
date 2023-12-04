@@ -1,6 +1,5 @@
-const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const csvParser = require("csv-parser");
-
 
 exports.handler = async (event) => {
     const s3 = new S3Client();
@@ -12,16 +11,37 @@ exports.handler = async (event) => {
     console.log('key:', objectName);
 
     try {
-        const s3Object = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: objectName }));
-        const csvData = await streamToString(s3Object.Body);
+        const getObjectCommand = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: objectName,
+        });
+
+        const s3Object = await s3.send(getObjectCommand);
 
         const results = [];
-        csvParser({ headers: true })
-            .on('data', (data) => results.push(data))
-            .on('end', () => {
-                console.log(results);
-            })
-            .write(csvData);
+        const parser = s3Object.Body.pipe(csvParser());
+
+        for await (const record of parser) {
+            results.push(record);
+        }
+
+        console.log('Parsed CSV data:', results)
+
+        const newObjectKey = `parsed/${objectName.split('/').pop()}`;
+        await s3.send(new CopyObjectCommand({
+            Bucket: bucketName,
+            CopySource: `${bucketName}/${objectName}`,
+            Key: newObjectKey
+        }));
+
+        console.log('Copied file:', newObjectKey);
+
+        await s3.send(new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: objectName
+        }));
+
+        console.log('Deleted file:', objectName);
 
         return {
             statusCode: 200,
@@ -35,13 +55,4 @@ exports.handler = async (event) => {
             body: JSON.stringify({ message: 'Internal Server Error' }),
         };
     }
-};
-
-const streamToString = async (stream) => {
-    const chunks = [];
-    return new Promise((resolve, reject) => {
-        stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-        stream.on('error', (error) => reject(error));
-        stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    });
 };

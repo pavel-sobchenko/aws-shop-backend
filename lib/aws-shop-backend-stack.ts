@@ -77,6 +77,7 @@ export class AwsShopBackendStack extends cdk.Stack {
         code: lambda.Code.fromAsset('import-service/lambda'),
     });
     s3Bucket.grantRead(importFileParserLambda);
+    s3Bucket.grantDelete(importFileParserLambda);
 
     s3Bucket.addEventNotification(
         s3.EventType.OBJECT_CREATED,

@@ -7,7 +7,7 @@ describe('Lambda Function Tests', () => {
         awsMock.restore();
     });
 
-    it('should process CSV file successfully', async () => {
+    it('should process CSV file successfully', async (object, method) => {
         const mockS3Client = {
             send: jest.fn().mockResolvedValue({
                 Body: {
@@ -37,6 +37,9 @@ describe('Lambda Function Tests', () => {
             Records: [
                 {
                     s3: {
+                        bucket: {
+                            name: 'test-bucket',
+                        },
                         object: {
                             key: 'uploaded/test.csv',
                         },
