@@ -12,6 +12,7 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     const s3Bucket = s3.Bucket.fromBucketName(this, 'S3Bucket', 'rs-aws-be-sobchanka');
 
+    /***Product service lambda functions*******/
     const getProductsListLambda = new lambda.Function(this, 'GetProductsListLambda', {
       functionName: 'GetProductsListLambda',
       runtime: lambda.Runtime.NODEJS_18_X,
@@ -58,6 +59,9 @@ export class AwsShopBackendStack extends cdk.Stack {
       actions: ['dynamodb:PutItem'],
       resources: ['*']
     }));
+    /***End of product service lambda functions*******/
+
+    /***Import service lambda functions*******/
 
     const importProductsFileLambda = new lambda.Function(this, 'ImportProductsFileLambda', {
         functionName: 'ImportProductsFileLambda',
@@ -86,6 +90,8 @@ export class AwsShopBackendStack extends cdk.Stack {
           prefix: 'uploaded/'
         });
     new cdk.CfnOutput(this, 'S3BucketName', { value: s3Bucket.bucketName });
+
+    /***End of import service lambda functions*******/
 
     const api = new apigateway.RestApi(this, 'aws-shop-api', {
       restApiName: 'aws-shop-api',
