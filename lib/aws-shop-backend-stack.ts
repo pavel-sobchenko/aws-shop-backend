@@ -3,15 +3,20 @@ import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 
 export class AwsShopBackendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    const s3Bucket = s3.Bucket.fromBucketName(this, 'S3Bucket', 'rs-aws-be-sobchanka');
+
+    /***Product service lambda functions*******/
     const getProductsListLambda = new lambda.Function(this, 'GetProductsListLambda', {
       functionName: 'GetProductsListLambda',
       runtime: lambda.Runtime.NODEJS_18_X,
-      code: lambda.Code.fromAsset('lambda'),
+      code: lambda.Code.fromAsset('product-service/lambda'),
       handler: 'productList.handler',
       environment: {
         PRODUCTS_TABLE: 'Products',
@@ -28,7 +33,7 @@ export class AwsShopBackendStack extends cdk.Stack {
       functionName: 'GetProductsByIdLambda',
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'getProductById.handler',
-      code: lambda.Code.fromAsset('lambda'),
+      code: lambda.Code.fromAsset('product-service/lambda'),
       environment: {
         PRODUCTS_TABLE: 'Products',
         STOCK_TABLE: 'Stocks',
@@ -44,7 +49,7 @@ export class AwsShopBackendStack extends cdk.Stack {
       functionName: 'CreateProductLambda',
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'createProduct.handler',
-      code: lambda.Code.fromAsset('lambda'),
+      code: lambda.Code.fromAsset('product-service/lambda'),
       environment: {
         PRODUCTS_TABLE: 'Products',
       }
@@ -54,6 +59,39 @@ export class AwsShopBackendStack extends cdk.Stack {
       actions: ['dynamodb:PutItem'],
       resources: ['*']
     }));
+    /***End of product service lambda functions*******/
+
+    /***Import service lambda functions*******/
+
+    const importProductsFileLambda = new lambda.Function(this, 'ImportProductsFileLambda', {
+        functionName: 'ImportProductsFileLambda',
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: 'importProductsFile.handler',
+        code: lambda.Code.fromAsset('import-service/lambda'),
+        environment: {
+          S3_BUCKET_NAME: s3Bucket.bucketName
+        }
+    });
+    s3Bucket.grantWrite(importProductsFileLambda);
+
+    const importFileParserLambda = new lambda.Function(this, 'ImportFileParserLambda', {
+        functionName: 'ImportFileParserLambda',
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: 'importFileParser.handler',
+        code: lambda.Code.fromAsset('import-service/lambda'),
+    });
+    s3Bucket.grantRead(importFileParserLambda);
+    s3Bucket.grantDelete(importFileParserLambda);
+
+    s3Bucket.addEventNotification(
+        s3.EventType.OBJECT_CREATED,
+        new s3n.LambdaDestination(importFileParserLambda),
+        {
+          prefix: 'uploaded/'
+        });
+    new cdk.CfnOutput(this, 'S3BucketName', { value: s3Bucket.bucketName });
+
+    /***End of import service lambda functions*******/
 
     const api = new apigateway.RestApi(this, 'aws-shop-api', {
       restApiName: 'aws-shop-api',
@@ -61,6 +99,7 @@ export class AwsShopBackendStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: ['Content-Type'],
       }
     });
 
@@ -70,5 +109,13 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     const productIdResource = productsResource.addResource('{id}');
     productIdResource.addMethod('GET', new apigateway.LambdaIntegration(getProductsByIdLambda));
+
+    const importResource = api.root.addResource('import');
+    importResource.addMethod('GET', new apigateway.LambdaIntegration(importProductsFileLambda));
+
+    importProductsFileLambda.addPermission('ApiGatewayInvokePermission',{
+        principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+    });
+
   }
 }

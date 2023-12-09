@@ -4,8 +4,6 @@ const { TransactWriteCommand } =  require("@aws-sdk/lib-dynamodb");
 
 exports.handler = async (event) => {
     const dynamoDBClient = new DynamoDBClient();
-    const productsTableName = process.env.PRODUCTS_TABLE;
-    const stockTableName = process.env.STOCK_TABLE;
 
     console.log('eventBody:', event.body);
 
