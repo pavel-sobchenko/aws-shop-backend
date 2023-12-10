@@ -1,8 +1,10 @@
 const { S3Client, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
 const csvParser = require("csv-parser");
 
 exports.handler = async (event) => {
     const s3 = new S3Client();
+    const sqsClient = new SQSClient();
 
     const bucketName = event['Records'][0]['s3']['bucket']['name'];
     const objectName = event['Records'][0]['s3']['object']['key'];
@@ -18,14 +20,15 @@ exports.handler = async (event) => {
 
         const s3Object = await s3.send(getObjectCommand);
 
-        const results = [];
         const parser = s3Object.Body.pipe(csvParser());
 
         for await (const record of parser) {
-            results.push(record);
+            console.log('!!!!!', record);
+            await sqsClient.send(new SendMessageCommand({
+                QueueUrl: process.env.QUEUE_URL,
+                MessageBody: JSON.stringify(record),
+            }));
         }
-
-        console.log('Parsed CSV data:', results)
 
         const newObjectKey = `parsed/${objectName.split('/').pop()}`;
         await s3.send(new CopyObjectCommand({

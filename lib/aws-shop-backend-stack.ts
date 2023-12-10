@@ -5,12 +5,24 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as events_sources from 'aws-cdk-lib/aws-lambda-event-sources';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 
 export class AwsShopBackendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const s3Bucket = s3.Bucket.fromBucketName(this, 'S3Bucket', 'rs-aws-be-sobchanka');
+    const catalogItemsQueue = new sqs.Queue(this, 'CatalogItemsQueue', {
+        queueName: 'CatalogItemsQueue',
+        visibilityTimeout: cdk.Duration.seconds(300),
+    });
+    const createProductTopic = new sns.Topic(this, 'CreateProductTopic', {
+        displayName: 'CreateProductTopic',
+    });
+    createProductTopic.addSubscription(new sns_subscriptions.EmailSubscription('pavel.sobchanka@gmail.com'));
 
     /***Product service lambda functions*******/
     const getProductsListLambda = new lambda.Function(this, 'GetProductsListLambda', {
@@ -59,6 +71,36 @@ export class AwsShopBackendStack extends cdk.Stack {
       actions: ['dynamodb:PutItem'],
       resources: ['*']
     }));
+
+    const catalogBatchProcessLambda = new lambda.Function(this, 'CatalogBatchProcessLambda', {
+        functionName: 'CatalogBatchProcessLambda',
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: 'catalogBatchProcess.handler',
+        code: lambda.Code.fromAsset('product-service/lambda'),
+        environment: {
+           QUEUE_URL: catalogItemsQueue.queueUrl,
+           PRODUCTS_TABLE: 'Products',
+           STOCK_TABLE: 'Stocks',
+           CREATE_PRODUCT_SNS_TOPIC_ARN: createProductTopic.topicArn
+        }
+    });
+
+    catalogBatchProcessLambda.addToRolePolicy(new iam.PolicyStatement({
+        actions: ['dynamodb:PutItem'],
+        resources: ['*']
+    }));
+
+    catalogItemsQueue.grantSendMessages(catalogBatchProcessLambda);
+    catalogItemsQueue.grantConsumeMessages(catalogBatchProcessLambda);
+
+    catalogBatchProcessLambda.addEventSource(
+        new events_sources.SqsEventSource(catalogItemsQueue, {
+          batchSize: 5,
+        })
+    );
+
+    createProductTopic.grantPublish(catalogBatchProcessLambda);
+
     /***End of product service lambda functions*******/
 
     /***Import service lambda functions*******/
@@ -79,7 +121,12 @@ export class AwsShopBackendStack extends cdk.Stack {
         runtime: lambda.Runtime.NODEJS_18_X,
         handler: 'importFileParser.handler',
         code: lambda.Code.fromAsset('import-service/lambda'),
+        environment: {
+            QUEUE_URL: catalogItemsQueue.queueUrl,
+        }
     });
+    catalogItemsQueue.grantSendMessages(importFileParserLambda);
+
     s3Bucket.grantRead(importFileParserLambda);
     s3Bucket.grantDelete(importFileParserLambda);
 
@@ -90,6 +137,10 @@ export class AwsShopBackendStack extends cdk.Stack {
           prefix: 'uploaded/'
         });
     new cdk.CfnOutput(this, 'S3BucketName', { value: s3Bucket.bucketName });
+    new cdk.CfnOutput(this, 'SQSQueueURL', { value: catalogItemsQueue.queueUrl });
+    new cdk.CfnOutput(this, 'CatalogItemsQueueArn', {
+        value: createProductTopic.topicArn,
+    });
 
     /***End of import service lambda functions*******/
 
