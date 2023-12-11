@@ -178,5 +178,18 @@ export class AwsShopBackendStack extends cdk.Stack {
         principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
     });
 
+    const emailSubscriptionWithFilterPolicy = new sns_subscriptions.EmailSubscription(
+      'email@example.com',
+      {
+          filterPolicy: {
+              attributes: sns.SubscriptionFilter.stringFilter({
+                  allowlist: ['price']
+              })
+          }
+      }
+    );
+
+    createProductTopic.addSubscription(emailSubscriptionWithFilterPolicy);
+
   }
 }
