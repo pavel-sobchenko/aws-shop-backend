@@ -9,6 +9,7 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as events_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
 export class AwsShopBackendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -22,7 +23,12 @@ export class AwsShopBackendStack extends cdk.Stack {
     const createProductTopic = new sns.Topic(this, 'CreateProductTopic', {
         displayName: 'CreateProductTopic',
     });
-    createProductTopic.addSubscription(new sns_subscriptions.EmailSubscription('pavel.sobchanka@gmail.com'));
+
+    createProductTopic.addSubscription(new sns_subscriptions.EmailSubscription('email_to_subscribe@gmail.com'));
+
+    const productTable = dynamodb.Table.fromTableName(this, 'Products', 'Products');
+
+    const stockTable = dynamodb.Table.fromTableName(this, 'Stocks','Stocks');
 
     /***Product service lambda functions*******/
     const getProductsListLambda = new lambda.Function(this, 'GetProductsListLambda', {
@@ -91,6 +97,8 @@ export class AwsShopBackendStack extends cdk.Stack {
     }));
 
     catalogItemsQueue.grantSendMessages(catalogBatchProcessLambda);
+    productTable.grantReadWriteData(catalogBatchProcessLambda);
+    stockTable.grantReadWriteData(catalogBatchProcessLambda);
     catalogItemsQueue.grantConsumeMessages(catalogBatchProcessLambda);
 
     catalogBatchProcessLambda.addEventSource(
@@ -141,6 +149,8 @@ export class AwsShopBackendStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'CatalogItemsQueueArn', {
         value: createProductTopic.topicArn,
     });
+    new cdk.CfnOutput(this, 'ProductTableName', { value: productTable.tableName });
+    new cdk.CfnOutput(this, 'StockTableName', { value: stockTable.tableName });
 
     /***End of import service lambda functions*******/
 

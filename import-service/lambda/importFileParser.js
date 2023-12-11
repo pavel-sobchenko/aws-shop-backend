@@ -20,15 +20,17 @@ exports.handler = async (event) => {
 
         const s3Object = await s3.send(getObjectCommand);
 
-        const parser = s3Object.Body.pipe(csvParser());
+        const records = s3Object.Body.pipe(csvParser());
 
-        for await (const record of parser) {
-            console.log('!!!!!', record);
-            await sqsClient.send(new SendMessageCommand({
-                QueueUrl: process.env.QUEUE_URL,
-                MessageBody: JSON.stringify(record),
-            }));
+        const recordArray = [];
+        for await (const record of records) {
+            recordArray.push(record);
         }
+
+        await sqsClient.send(new SendMessageCommand({
+            QueueUrl: process.env.QUEUE_URL,
+            MessageBody: JSON.stringify(recordArray),
+        }));
 
         const newObjectKey = `parsed/${objectName.split('/').pop()}`;
         await s3.send(new CopyObjectCommand({
