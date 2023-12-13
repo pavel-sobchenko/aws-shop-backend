@@ -24,7 +24,7 @@ export class AwsShopBackendStack extends cdk.Stack {
         displayName: 'CreateProductTopic',
     });
 
-    createProductTopic.addSubscription(new sns_subscriptions.EmailSubscription('email_to_subscribe@gmail.com'));
+    createProductTopic.addSubscription(new sns_subscriptions.EmailSubscription('sobchanka@tut.by'));
 
     const productTable = dynamodb.Table.fromTableName(this, 'Products', 'Products');
 

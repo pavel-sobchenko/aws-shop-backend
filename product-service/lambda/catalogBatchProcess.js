@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { TransactWriteCommand } =  require("@aws-sdk/lib-dynamodb");
+const { SNSClient, PublishCommand } = require("@aws-sdk/client-sns");
 
 
 exports.handler = async (event) => {
@@ -9,6 +10,13 @@ exports.handler = async (event) => {
     console.log('product:', products);
 
     const dynamoDBClient = new DynamoDBClient();
+    const snsClient = new SNSClient();
+    const snsTopicArn = process.env.CREATE_PRODUCT_SNS_TOPIC_ARN;
+
+    if (!snsTopicArn) {
+        console.error('Missing SNS_TOPIC_ARN environment variable');
+        return;
+    }
 
     const productItems = convertArray(JSON.parse(products));
     console.log('productItem:', productItems);
@@ -49,6 +57,17 @@ exports.handler = async (event) => {
             })
         );
 
+        if (result) {
+            const command = new PublishCommand({
+                Subject: 'New products created',
+                Message: JSON.stringify(productItems),
+                TopicArn: snsTopicArn,
+            });
+
+            const response = await snsClient.send(command);
+            console.log('Message published to SNS:', response);
+        }
+
         console.log('Transaction result:', result);
 
         return {
@@ -74,7 +93,7 @@ exports.handler = async (event) => {
 
 
 const convertArray = (inputArray) => {
-    return inputArray.map((obj, index) => {
+    return inputArray.map(obj => {
         const id = `${crypto.randomUUID()}`;
         const newObj = { id, ...obj };
         return Object.fromEntries(Object.entries(newObj).map(([key, value]) => [key.toLowerCase(), value]));
