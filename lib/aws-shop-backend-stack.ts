@@ -10,6 +10,7 @@ import * as events_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import 'dotenv/config';
 
 export class AwsShopBackendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -154,6 +155,26 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     /***End of import service lambda functions*******/
 
+    /***Autorization service lambda functions*******/
+
+    const basicAuthorizerLambda = new lambda.Function(this, 'BasicAuthorizerLambda', {
+        functionName: 'BasicAuthorizerLambda',
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: 'basicAuthorizer.handler',
+        code: lambda.Code.fromAsset('authorization-service/lambda'),
+        environment: {
+            LOGIN_PASSWORD: 'pavel-sobchenko=TEST_PASSWORD',
+            // LOGIN_PASSWORD: process.env.LOGIN=process.env.TEST_PASSWORD,
+        }
+    });
+
+    // const authorizer = new apigateway.TokenAuthorizer(this, 'BasicAuthorizer', {
+    //     handler: basicAuthorizerLambda,
+    //     identitySource: 'method.request.header.Authorization',
+    // });
+
+    /***End of autorization service lambda functions*******/
+
     const api = new apigateway.RestApi(this, 'aws-shop-api', {
       restApiName: 'aws-shop-api',
       description: 'This is my first API Gateway service',
@@ -171,12 +192,26 @@ export class AwsShopBackendStack extends cdk.Stack {
     const productIdResource = productsResource.addResource('{id}');
     productIdResource.addMethod('GET', new apigateway.LambdaIntegration(getProductsByIdLambda));
 
-    const importResource = api.root.addResource('import');
+    const importResource = api.root.addResource('import',
+        // {
+        //     defaultMethodOptions: {
+        //         authorizer
+        //     }
+        // }
+        );
     importResource.addMethod('GET', new apigateway.LambdaIntegration(importProductsFileLambda));
 
     importProductsFileLambda.addPermission('ApiGatewayInvokePermission',{
         principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
     });
+
+    // const secureEndpoint = api.root.addResource('secure');
+    // secureEndpoint.addMethod('GET', new apigateway.HttpIntegration('http:/localhost:3000'), {
+    //     authorizationType: apigateway.AuthorizationType.CUSTOM,
+    //     authorizer: {
+    //         authorizerId: authorizer.authorizerId,
+    //     }
+    // });
 
     const emailSubscriptionWithFilterPolicy = new sns_subscriptions.EmailSubscription(
       'email@example.com',
