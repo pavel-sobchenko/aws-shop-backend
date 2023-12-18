@@ -1,5 +1,4 @@
-// require('dotenv').config();
-// const dotenv = require('dotenv');
+const dotenv = require('dotenv');
 
 exports.handler = async (event, context) => {
     console.log('!@# Basic Authorizer event: ', event);
@@ -24,8 +23,7 @@ exports.handler = async (event, context) => {
         const [username, password] = decodedCredentials.split(':');
         console.log('username: ', username);
         console.log('password: ', password);
-        // const expectedPassword = process.env[username];
-        const expectedPassword = 'TEST-PASSWORD';
+        const expectedPassword = process.env.PASSWORD;
         console.log('expectedPassword: ', expectedPassword);
         //
         if (expectedPassword === password) {

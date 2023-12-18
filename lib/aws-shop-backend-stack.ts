@@ -10,7 +10,8 @@ import * as events_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import 'dotenv/config';
+import { config } from "dotenv";
+config();
 
 export class AwsShopBackendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -163,8 +164,8 @@ export class AwsShopBackendStack extends cdk.Stack {
         handler: 'basicAuthorizer.handler',
         code: lambda.Code.fromAsset('authorization-service/lambda'),
         environment: {
-            LOGIN_PASSWORD: 'pavel-sobchenko=TEST_PASSWORD',
-            // LOGIN_PASSWORD: process.env.LOGIN=process.env.TEST_PASSWORD,
+            LOGIN: process.env.LOGIN!,
+            PASSWORD: process.env.PASSWORD!,
         }
     });
 
