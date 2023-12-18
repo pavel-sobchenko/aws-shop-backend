@@ -35,7 +35,7 @@ exports.handler = async (event, context) => {
         } else {
             return {
                 statusCode: 403,
-                body: JSON.stringify({ message: 'Access denied MOTHERFUCKER!!!!' }),
+                body: JSON.stringify({ message: 'Access denied' }),
             };
         }
     } catch (error) {

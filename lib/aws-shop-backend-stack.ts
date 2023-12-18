@@ -168,10 +168,10 @@ export class AwsShopBackendStack extends cdk.Stack {
         }
     });
 
-    const authorizer = new apigateway.TokenAuthorizer(this, 'BasicAuthorizer', {
+      const authorizer = new apigateway.RequestAuthorizer(this, 'BasicAuthorizer', {
         handler: basicAuthorizerLambda,
-        identitySource: 'method.request.header.Authorization',
-    });
+        identitySources: [apigateway.IdentitySource.header('Authorization')],
+      });
 
     /***End of autorization service lambda functions*******/
 
@@ -181,7 +181,7 @@ export class AwsShopBackendStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: ['Content-Type'],
+        allowHeaders: ['Content-Type', 'authorization', 'Authorization'],
       }
     });
 
@@ -192,22 +192,11 @@ export class AwsShopBackendStack extends cdk.Stack {
     const productIdResource = productsResource.addResource('{id}');
     productIdResource.addMethod('GET', new apigateway.LambdaIntegration(getProductsByIdLambda));
 
-    const importResource = api.root.addResource('import',
-        {
-            defaultMethodOptions: {
-                methodResponses: [{
-                    statusCode: '200',
-                    responseParameters: {
-                        'method.response.header.Content-Type': true,
-                        'method.response.header.Access-Control-Allow-Origin': true,
-                    },
-                }],
-                authorizationType: apigateway.AuthorizationType.CUSTOM,
-                authorizer
-            }
-        }
-        );
-    importResource.addMethod('GET', new apigateway.LambdaIntegration(importProductsFileLambda));
+    const importResource = api.root.addResource('import');
+    importResource.addMethod('GET', new apigateway.LambdaIntegration(importProductsFileLambda), {
+        authorizer: authorizer,
+        authorizationType: apigateway.AuthorizationType.CUSTOM,
+    });
 
     importProductsFileLambda.addPermission('ApiGatewayInvokePermission',{
         principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
