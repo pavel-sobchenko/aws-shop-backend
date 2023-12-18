@@ -168,10 +168,10 @@ export class AwsShopBackendStack extends cdk.Stack {
         }
     });
 
-    // const authorizer = new apigateway.TokenAuthorizer(this, 'BasicAuthorizer', {
-    //     handler: basicAuthorizerLambda,
-    //     identitySource: 'method.request.header.Authorization',
-    // });
+    const authorizer = new apigateway.TokenAuthorizer(this, 'BasicAuthorizer', {
+        handler: basicAuthorizerLambda,
+        identitySource: 'method.request.header.Authorization',
+    });
 
     /***End of autorization service lambda functions*******/
 
@@ -193,25 +193,25 @@ export class AwsShopBackendStack extends cdk.Stack {
     productIdResource.addMethod('GET', new apigateway.LambdaIntegration(getProductsByIdLambda));
 
     const importResource = api.root.addResource('import',
-        // {
-        //     defaultMethodOptions: {
-        //         authorizer
-        //     }
-        // }
+        {
+            defaultMethodOptions: {
+                methodResponses: [{
+                    statusCode: '200',
+                    responseParameters: {
+                        'method.response.header.Content-Type': true,
+                        'method.response.header.Access-Control-Allow-Origin': true,
+                    },
+                }],
+                authorizationType: apigateway.AuthorizationType.CUSTOM,
+                authorizer
+            }
+        }
         );
     importResource.addMethod('GET', new apigateway.LambdaIntegration(importProductsFileLambda));
 
     importProductsFileLambda.addPermission('ApiGatewayInvokePermission',{
         principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
     });
-
-    // const secureEndpoint = api.root.addResource('secure');
-    // secureEndpoint.addMethod('GET', new apigateway.HttpIntegration('http:/localhost:3000'), {
-    //     authorizationType: apigateway.AuthorizationType.CUSTOM,
-    //     authorizer: {
-    //         authorizerId: authorizer.authorizerId,
-    //     }
-    // });
 
     const emailSubscriptionWithFilterPolicy = new sns_subscriptions.EmailSubscription(
       'email@example.com',
