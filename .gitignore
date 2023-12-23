@@ -2,9 +2,11 @@
 !jest.config.js
 !product-service/lambda/*.js
 !import-service/lambda/*.js
+!authorization-service/lambda/*.js
 *.d.ts
 node_modules
 .idea
 # CDK asset staging directory
 .cdk.staging
 cdk.out
+.env

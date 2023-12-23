@@ -10,6 +10,8 @@ import * as events_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import { config } from "dotenv";
+config();
 
 export class AwsShopBackendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -154,13 +156,33 @@ export class AwsShopBackendStack extends cdk.Stack {
 
     /***End of import service lambda functions*******/
 
+    /***Autorization service lambda functions*******/
+
+    const basicAuthorizerLambda = new lambda.Function(this, 'BasicAuthorizerLambda', {
+        functionName: 'BasicAuthorizerLambda',
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: 'basicAuthorizer.handler',
+        code: lambda.Code.fromAsset('authorization-service/lambda'),
+        environment: {
+            LOGIN: process.env.LOGIN!,
+            PASSWORD: process.env.PASSWORD!,
+        }
+    });
+
+      const authorizer = new apigateway.RequestAuthorizer(this, 'BasicAuthorizer', {
+        handler: basicAuthorizerLambda,
+        identitySources: [apigateway.IdentitySource.header('Authorization')],
+      });
+
+    /***End of autorization service lambda functions*******/
+
     const api = new apigateway.RestApi(this, 'aws-shop-api', {
       restApiName: 'aws-shop-api',
       description: 'This is my first API Gateway service',
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: ['Content-Type'],
+        allowHeaders: ['Content-Type', 'authorization', 'Authorization'],
       }
     });
 
@@ -172,7 +194,10 @@ export class AwsShopBackendStack extends cdk.Stack {
     productIdResource.addMethod('GET', new apigateway.LambdaIntegration(getProductsByIdLambda));
 
     const importResource = api.root.addResource('import');
-    importResource.addMethod('GET', new apigateway.LambdaIntegration(importProductsFileLambda));
+    importResource.addMethod('GET', new apigateway.LambdaIntegration(importProductsFileLambda), {
+        authorizer: authorizer,
+        authorizationType: apigateway.AuthorizationType.CUSTOM,
+    });
 
     importProductsFileLambda.addPermission('ApiGatewayInvokePermission',{
         principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
